@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "▶ Run Flask App",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/app.py",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "env": { "FLASK_ENV": "development" },
+      "args": []
+    },
+    {
+      "name": "🔬 Fine-tune LLaMA-3",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/agents/diagnosis_agent.py",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "args": ["--mode", "finetune"]
+    },
+    {
+      "name": "📊 Preprocess NIH Data",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/utils/preprocess.py",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "🧪 Run Pipeline Test",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/test_pipeline.py",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ]
+}

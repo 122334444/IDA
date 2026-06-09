@@ -1,0 +1,93 @@
+# config/config.yaml
+
+# ─── Paths ───────────────────────────────────────────────────────────────────
+paths:
+  data_raw: "data/raw/nih_xray"
+  data_processed: "data/processed"
+  knowledge_graphs: "data/knowledge_graphs"
+  models: "models"
+  medical_guidelines: "data/medical_guidelines" # PDFs/TXTs of clinical guidelines
+  fine_tuned_model: "models/llama3_finetuned"
+  vector_db: "data/vector_db"
+
+# ─── NIH Chest X-Ray Dataset ─────────────────────────────────────────────────
+dataset:
+  name: "NIH Chest X-Ray"
+  image_dir: "data/raw/nih_xray/images"
+  labels_csv: "data/raw/nih_xray/Data_Entry_2017.csv"
+  bbox_csv: "data/raw/nih_xray/BBox_List_2017.csv"
+  # Diseases to focus on (subset for fine-tuning)
+  target_diseases:
+    - "Cardiomegaly" # maps to CHF indicator
+    - "Edema" # CHF indicator
+    - "Effusion" # CHF / UTI indicator
+    - "Pneumonia" # UTI indicator
+    - "Atelectasis"
+    - "Consolidation"
+  train_ratio: 0.80
+  val_ratio: 0.10
+  test_ratio: 0.10
+  image_size: 224
+
+# ─── LLM (Diagnosis Agent) ───────────────────────────────────────────────────
+llm:
+  base_model: "meta-llama/Meta-Llama-3-8B-Instruct"
+  # Quantisation & Fine-tuning (QLoRA)
+  quantisation:
+    load_in_4bit: true
+    bnb_4bit_quant_type: "nf4"
+    bnb_4bit_compute_dtype: "float16"
+    bnb_4bit_use_double_quant: true
+  lora:
+    r: 64
+    lora_alpha: 16
+    target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+    lora_dropout: 0.05
+    bias: "none"
+    task_type: "CAUSAL_LM"
+  training:
+    max_token_length: 512 # experiment with 128, 256, 512
+    num_train_epochs: 2 # experiment with 1, 2, 5
+    per_device_train_batch_size: 4
+    gradient_accumulation_steps: 4
+    learning_rate: 2.0e-4
+    warmup_ratio: 0.03
+    lr_scheduler_type: "cosine"
+    fp16: true
+    logging_steps: 10
+    save_steps: 100
+    output_dir: "models/llama3_finetuned"
+  inference:
+    max_new_tokens: 256
+    temperature: 0.1
+    do_sample: false
+
+# ─── Explanation Agent (RAG) ──────────────────────────────────────────────────
+rag:
+  embedding_model: "sentence-transformers/all-mpnet-base-v2"
+  chunk_size: 512
+  chunk_overlap: 50
+  top_n_results: 5
+  mmr_lambda: 0.5 # Maximal Marginal Relevance diversity
+  collection_name: "medical_guidelines"
+
+# ─── Knowledge Graph ─────────────────────────────────────────────────────────
+knowledge_graph:
+  # Medical ontologies for NER
+  ontologies:
+    - "SYMP" # Symptom Ontology
+    - "DO" # Disease Ontology
+    - "FMA" # Foundational Model of Anatomy
+    - "RadLex" # Radiology Lexicon
+    - "Demographics"
+  xray_model: "openai/clip-vit-large-patch14" # CheXzero-style CLIP model
+
+# ─── Flask Application ────────────────────────────────────────────────────────
+app:
+  host: "0.0.0.0"
+  port: 5001
+  debug: false
+  secret_key: "change-in-production"
+
+# ─── Fine-tuning Threshold ────────────────────────────────────────────────────
+finetune_threshold: 50 # retrain after N new patient instances

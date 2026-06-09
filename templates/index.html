@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Intelligent Doctor Assistant</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+:root{--bg:#0a0e1a;--surface:#111827;--card:#1a2235;--border:#1e3a5f;--accent:#00d4ff;--accent2:#00ff88;--danger:#ff4757;--warn:#ffa502;--text:#e8f4fd;--muted:#6b8caa;--font:'IBM Plex Sans',sans-serif;--mono:'IBM Plex Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden}
+.header{background:linear-gradient(135deg,#0d1b2a,#112240);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100}
+.header-logo{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px}
+.header-title{font-size:20px;font-weight:600;color:var(--accent)}
+.header-sub{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.header-status{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px;color:var(--accent2);font-family:var(--mono)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.main{display:grid;grid-template-columns:380px 1fr;min-height:calc(100vh - 73px)}
+.left-panel{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px}
+.section-label{font-size:10px;font-weight:600;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:12px}
+.action-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.action-btn{padding:10px 6px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:11px;cursor:pointer;transition:all .2s;text-align:center;font-family:var(--mono)}
+.action-btn:hover,.action-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.08)}
+.demo-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.demo-btn{padding:10px 6px;border-radius:8px;border:1px solid;font-size:11px;cursor:pointer;transition:all .2s;text-align:center;font-family:var(--mono);display:flex;flex-direction:column;align-items:center;gap:4px}
+.demo-btn.chf{border-color:#ff4757;color:#ff4757;background:rgba(255,71,87,.05)}
+.demo-btn.chf:hover{background:rgba(255,71,87,.15)}
+.demo-btn.pne{border-color:var(--warn);color:var(--warn);background:rgba(255,165,2,.05)}
+.demo-btn.pne:hover{background:rgba(255,165,2,.15)}
+.demo-btn.norm{border-color:var(--accent2);color:var(--accent2);background:rgba(0,255,136,.05)}
+.demo-btn.norm:hover{background:rgba(0,255,136,.15)}
+
+/* ── X-ray upload drop zone ── */
+.xray-drop{border:2px dashed var(--border);border-radius:12px;padding:24px 16px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:var(--card)}
+.xray-drop:hover,.xray-drop.dragover{border-color:var(--accent);background:rgba(0,212,255,.05)}
+.xray-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.xray-drop-icon{font-size:32px;margin-bottom:8px;opacity:.5}
+.xray-drop-text{font-size:13px;color:var(--muted)}
+.xray-drop-hint{font-size:11px;color:var(--border);margin-top:4px;font-family:var(--mono)}
+.xray-preview{width:100%;border-radius:8px;margin-top:12px;border:1px solid var(--border);display:none}
+.xray-findings{margin-top:12px;display:none}
+.finding-chip{display:inline-flex;align-items:center;gap:5px;background:rgba(0,212,255,.08);border:1px solid var(--accent);color:var(--accent);border-radius:20px;padding:3px 10px;font-size:11px;margin:3px;font-family:var(--mono)}
+.finding-chip .conf{color:var(--accent2);font-size:10px}
+.analyzing-badge{display:none;font-size:11px;color:var(--warn);font-family:var(--mono);margin-top:8px;text-align:center;animation:pulse 1.5s infinite}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+label{font-size:11px;color:var(--muted);font-family:var(--mono)}
+input,select,textarea{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-size:13px;font-family:var(--font);transition:border-color .2s;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+textarea{resize:vertical;min-height:70px}
+.symptom-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.symptom-tag{background:rgba(0,212,255,.1);border:1px solid var(--accent);color:var(--accent);border-radius:20px;padding:3px 10px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:var(--mono)}
+.run-btn{width:100%;padding:14px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#0a0e1a;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--font)}
+.run-btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,212,255,.3)}
+.run-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+.right-panel{overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.2)}
+.card-title{font-size:13px;font-weight:600;font-family:var(--mono);color:var(--accent)}
+.card-badge{margin-left:auto;font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:4px}
+.card-body{padding:18px}
+.diagnosis-main{font-size:24px;font-weight:600;color:var(--accent2);margin-bottom:8px}
+.confidence-bar{height:6px;background:var(--border);border-radius:3px;margin:8px 0;overflow:hidden}
+.confidence-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 1s ease}
+.diff-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.diff-tag{background:rgba(255,165,2,.1);border:1px solid var(--warn);color:var(--warn);border-radius:4px;padding:3px 8px;font-size:11px;font-family:var(--mono)}
+#kg-canvas{width:100%;height:400px;background:var(--bg);border-radius:8px}
+.triple-table{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)}
+.triple-table th{color:var(--muted);font-weight:500;padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)}
+.triple-table td{padding:6px 10px;border-bottom:1px solid rgba(30,58,95,.5)}
+.t-subject{color:var(--accent)}.t-pred{color:var(--warn)}.t-obj{color:var(--accent2);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.explanation-body{font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap}
+.explanation-body h2,.explanation-body h3{color:var(--accent);margin:12px 0 6px;font-family:var(--mono)}
+.loading-overlay{display:none;position:fixed;inset:0;z-index:1000;background:rgba(10,14,26,.85);backdrop-filter:blur(4px);align-items:center;justify-content:center;flex-direction:column;gap:16px}
+.loading-overlay.active{display:flex}
+.spinner{width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-family:var(--mono);color:var(--accent);font-size:14px}
+.pipeline{display:flex;align-items:center;gap:0;margin:16px 0}
+.pipe-node{flex:1;text-align:center;padding:10px 6px;border-radius:8px;border:1px solid var(--border);font-size:11px;font-family:var(--mono);color:var(--muted);transition:all .4s}
+.pipe-node.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.08)}
+.pipe-node.done{border-color:var(--accent2);color:var(--accent2);background:rgba(0,255,136,.08)}
+.pipe-arrow{color:var(--border);padding:0 4px;font-size:14px}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:400px;gap:16px;color:var(--muted);text-align:center}
+.welcome-icon{font-size:64px;opacity:.3}
+.xray-scan-result{background:rgba(0,212,255,.05);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-top:10px;font-size:12px;font-family:var(--mono)}
+.xray-scan-title{color:var(--accent);font-size:11px;margin-bottom:6px;letter-spacing:1px}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">Processing...</div>
+</div>
+
+<header class="header">
+  <div class="header-logo">🏥</div>
+  <div>
+    <div class="header-title">Intelligent Doctor Assistant</div>
+    <div class="header-sub">Agentic AI · CheXzero · LLaMA-3 · NIH Chest X-Ray</div>
+  </div>
+  <div class="header-status"><div class="dot"></div><span>4 Agents Ready</span></div>
+</header>
+
+<div class="main">
+<div class="left-panel">
+
+  <!-- Action -->
+  <div>
+    <div class="section-label">Action</div>
+    <div class="action-grid">
+      <button class="action-btn" onclick="setAction('kg_only')" id="btn-kg">📊 KG Only</button>
+      <button class="action-btn active" onclick="setAction('predict')" id="btn-predict">🔬 Predict</button>
+      <button class="action-btn" onclick="setAction('explain')" id="btn-explain">💡 Explain</button>
+    </div>
+  </div>
+
+  <!-- Demo patients -->
+  <div>
+    <div class="section-label">Quick Demo (no upload needed)</div>
+    <div class="demo-grid">
+      <button class="demo-btn chf" onclick="loadDemo('chf')"><span>❤️</span><span>CHF</span><span style="font-size:9px">72M</span></button>
+      <button class="demo-btn pne" onclick="loadDemo('pneumonia')"><span>🫁</span><span>Pneumonia</span><span style="font-size:9px">45F</span></button>
+      <button class="demo-btn norm" onclick="loadDemo('normal')"><span>✅</span><span>Normal</span><span style="font-size:9px">34M</span></button>
+    </div>
+  </div>
+
+  <!-- X-ray Upload — MAIN INPUT -->
+  <div>
+    <div class="section-label">Chest X-Ray Image ← main input</div>
+    <div class="xray-drop" id="xray-drop" ondragover="onDrag(event,true)" ondragleave="onDrag(event,false)" ondrop="onDrop(event)">
+      <input type="file" id="xray-file" accept=".dcm,.png,.jpg,.jpeg,.tiff,.bmp" onchange="onFileSelect(event)"/>
+      <div class="xray-drop-icon">🩻</div>
+      <div class="xray-drop-text">Drop X-ray here or click to upload</div>
+      <div class="xray-drop-hint">DICOM (.dcm) · PNG · JPG</div>
+    </div>
+    <div class="analyzing-badge" id="analyzing-badge">⚙️ Analyzing X-ray with CheXzero...</div>
+    <img id="xray-preview" class="xray-preview" alt="X-ray preview"/>
+    <!-- Auto-detected findings shown here -->
+    <div class="xray-findings" id="xray-findings">
+      <div class="xray-scan-result">
+        <div class="xray-scan-title">AUTO-DETECTED FINDINGS</div>
+        <div id="findings-chips"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Patient Info -->
+  <div>
+    <div class="section-label">Patient Info</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Patient ID</label><input id="patient_id" placeholder="Auto-generated"/></div>
+      <div class="form-group"><label>Gender</label><select id="gender"><option value="M">Male</option><option value="F">Female</option></select></div>
+      <div class="form-group"><label>Age</label><input id="age" type="number" value="60"/></div>
+      <div class="form-group"><label>Heart Rate (bpm)</label><input id="heart_rate" type="number" value="80"/></div>
+      <div class="form-group"><label>BP Systolic</label><input id="bp_systolic" type="number" value="120"/></div>
+      <div class="form-group"><label>BP Diastolic</label><input id="bp_diastolic" type="number" value="80"/></div>
+      <div class="form-group"><label>Temperature (°C)</label><input id="temperature" type="number" step="0.1" value="37.0"/></div>
+      <div class="form-group"><label>O2 Saturation (%)</label><input id="o2_saturation" type="number" value="97"/></div>
+      <div class="form-group full"><label>Respiratory Rate</label><input id="respiratory_rate" type="number" value="16"/></div>
+      <div class="form-group full">
+        <label>Symptoms (optional)</label>
+        <div style="display:flex;gap:6px">
+          <input id="symptom-input" placeholder="e.g. dyspnea" style="flex:1" onkeydown="if(event.key==='Enter')addSymptom()"/>
+          <button onclick="addSymptom()" style="background:var(--accent);color:#0a0e1a;border:none;border-radius:6px;padding:8px 12px;cursor:pointer;font-weight:600">+</button>
+        </div>
+        <div class="symptom-tags" id="symptom-tags"></div>
+      </div>
+      <div class="form-group full">
+        <label>Clinical Notes (optional)</label>
+        <textarea id="clinical_narrative" placeholder="Free-text clinical notes — leave blank to auto-generate"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <button class="run-btn" id="run-btn" onclick="runIDA()">▶ Run Intelligent Doctor Assistant</button>
+</div>
+
+<!-- Right panel -->
+<div class="right-panel" id="right-panel">
+  <div class="welcome" id="welcome">
+    <div class="welcome-icon">🩻</div>
+    <h2 style="color:var(--text)">Upload a Chest X-Ray to begin</h2>
+    <p style="max-width:360px;line-height:1.6">Upload a DICOM or PNG/JPG chest X-ray. The system automatically detects findings using CheXzero — no manual input needed. Then fill in patient vitals and click Run.</p>
+    <p style="color:var(--accent);font-family:var(--mono);font-size:12px">X-ray → CheXzero → SPA → DA → EA</p>
+  </div>
+</div>
+</div>
+
+<script>
+let currentAction='predict', symptoms=[], detectedFindings=[], xrayFile=null;
+
+function setAction(a){
+  currentAction=a;
+  document.getElementById('btn-kg').classList.toggle('active',a==='kg_only');
+  document.getElementById('btn-predict').classList.toggle('active',a==='predict');
+  document.getElementById('btn-explain').classList.toggle('active',a==='explain');
+}
+
+// ── X-ray upload ──────────────────────────────────────────────────────────────
+function onDrag(e,on){e.preventDefault();document.getElementById('xray-drop').classList.toggle('dragover',on)}
+function onDrop(e){e.preventDefault();onDrag(e,false);const f=e.dataTransfer.files[0];if(f)handleXrayFile(f)}
+function onFileSelect(e){const f=e.target.files[0];if(f)handleXrayFile(f)}
+
+function handleXrayFile(file){
+  xrayFile = file;
+  // Show preview (skip DICOM as browser can't display natively)
+  if(!file.name.endsWith('.dcm')){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=document.getElementById('xray-preview');
+      img.src=e.target.result; img.style.display='block';
+    };
+    reader.readAsDataURL(file);
+  }
+  // Auto-analyze immediately
+  analyzeXray(file);
+}
+
+async function analyzeXray(file){
+  document.getElementById('analyzing-badge').style.display='block';
+  document.getElementById('xray-findings').style.display='none';
+  try{
+    const fd=new FormData();
+    fd.append('xray_image',file);
+    const res=await fetch('/api/analyze-xray',{method:'POST',body:fd});
+    const data=await res.json();
+    if(data.findings && data.findings.length>0){
+      detectedFindings=data.findings;
+      renderFindingChips(data.findings);
+      document.getElementById('xray-findings').style.display='block';
+    }
+  }catch(e){console.error('X-ray analysis failed:',e)}
+  document.getElementById('analyzing-badge').style.display='none';
+}
+
+function renderFindingChips(findings){
+  const container=document.getElementById('findings-chips');
+  container.innerHTML=findings.map(f=>
+    `<span class="finding-chip">${f.pathology} <span class="conf">${Math.round(f.confidence*100)}%</span></span>`
+  ).join('');
+}
+
+// ── Symptoms ─────────────────────────────────────────────────────────────────
+function addSymptom(){
+  const inp=document.getElementById('symptom-input');
+  const v=inp.value.trim();
+  if(!v||symptoms.includes(v)){inp.value='';return}
+  symptoms.push(v);
+  renderTags(); inp.value='';
+}
+function removeSymptom(s){symptoms=symptoms.filter(x=>x!==s);renderTags()}
+function renderTags(){
+  document.getElementById('symptom-tags').innerHTML=symptoms.map(s=>
+    `<div class="symptom-tag">${s} <span onclick="removeSymptom('${s}')" style="color:var(--danger)">×</span></div>`
+  ).join('');
+}
+
+// ── Loading ───────────────────────────────────────────────────────────────────
+function setLoading(on,text='Processing...'){
+  document.getElementById('loading').classList.toggle('active',on);
+  document.getElementById('loading-text').textContent=text;
+  document.getElementById('run-btn').disabled=on;
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+async function loadDemo(scenario){
+  setLoading(true,`Running ${scenario.toUpperCase()} demo...`);
+  try{
+    const r=await fetch('/api/demo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenario,action:currentAction})});
+    renderResults(await r.json());
+  }catch(e){alert('Error: '+e.message)}
+  setLoading(false);
+}
+
+// ── Main run ──────────────────────────────────────────────────────────────────
+async function runIDA(){
+  setLoading(true,'Sending to IDA pipeline...');
+  try{
+    const fd=new FormData();
+    fd.append('action',currentAction);
+    fd.append('patient_id',document.getElementById('patient_id').value||`P${Date.now()}`);
+    fd.append('age',document.getElementById('age').value||60);
+    fd.append('gender',document.getElementById('gender').value);
+    fd.append('heart_rate',document.getElementById('heart_rate').value||80);
+    fd.append('bp_systolic',document.getElementById('bp_systolic').value||120);
+    fd.append('bp_diastolic',document.getElementById('bp_diastolic').value||80);
+    fd.append('temperature',document.getElementById('temperature').value||37.0);
+    fd.append('o2_saturation',document.getElementById('o2_saturation').value||97);
+    fd.append('respiratory_rate',document.getElementById('respiratory_rate').value||16);
+    fd.append('symptoms',symptoms.join(','));
+    fd.append('clinical_narrative',document.getElementById('clinical_narrative').value);
+    if(xrayFile) fd.append('xray_image',xrayFile);
+
+    const r=await fetch('/api/process',{method:'POST',body:fd});
+    renderResults(await r.json());
+  }catch(e){alert('Error: '+e.message)}
+  setLoading(false);
+}
+
+// ── Render results ────────────────────────────────────────────────────────────
+function renderResults(data){
+  const panel=document.getElementById('right-panel');
+  panel.innerHTML='';
+  if(data.error){
+    panel.innerHTML=`<div class="card"><div class="card-body" style="color:var(--danger)">Error: ${data.error}</div></div>`;
+    return;
+  }
+
+  // Pipeline status
+  panel.innerHTML+=`
+  <div class="card">
+    <div class="card-header"><span>⚙️</span><span class="card-title">Agent Pipeline</span>
+    <span class="card-badge" style="background:rgba(0,255,136,.1);color:var(--accent2)">✓ Complete</span></div>
+    <div class="card-body">
+      <div class="pipeline">
+        <div class="pipe-node done">IDA<br><small>Orchestrator</small></div><div class="pipe-arrow">→</div>
+        <div class="pipe-node ${data.knowledge_graph?'done':''}">SPA<br><small>KG+Prompt</small></div><div class="pipe-arrow">→</div>
+        <div class="pipe-node ${data.diagnosis?'done':''}">DA<br><small>LLaMA-3</small></div><div class="pipe-arrow">→</div>
+        <div class="pipe-node ${data.explanation?'done':''}">EA<br><small>RAG</small></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">
+        Patient: <span style="color:var(--accent)">${data.patient_id}</span> &nbsp;|&nbsp;
+        Action: <span style="color:var(--accent2)">${data.action}</span>
+      </div>
+    </div>
+  </div>`;
+
+  // X-ray findings from CheXzero
+  if(data.xray_analysis && data.xray_analysis.findings && data.xray_analysis.findings.length>0){
+    const chips=data.xray_analysis.findings.map(f=>
+      `<span class="finding-chip">${f.pathology} <span class="conf">${Math.round(f.confidence*100)}%</span></span>`
+    ).join('');
+    panel.innerHTML+=`
+    <div class="card">
+      <div class="card-header"><span>🩻</span><span class="card-title">CheXzero X-ray Analysis</span>
+      <span class="card-badge" style="background:rgba(0,212,255,.1);color:var(--accent)">Auto-detected</span></div>
+      <div class="card-body">
+        <div style="margin-bottom:8px;font-size:12px;color:var(--muted)">Pathologies extracted automatically from image:</div>
+        ${chips}
+        ${data.xray_analysis.note?`<div style="font-size:11px;color:var(--warn);margin-top:8px;font-family:var(--mono)">${data.xray_analysis.note}</div>`:''}
+      </div>
+    </div>`;
+  }
+
+  // Diagnosis
+  if(data.diagnosis){
+    const d=data.diagnosis, conf=Math.round((d.confidence||0)*100);
+    const cc=conf>=70?'var(--accent2)':conf>=50?'var(--warn)':'var(--danger)';
+    const diffs=(d.differentials||[]).map(dd=>`<span class="diff-tag">${dd}</span>`).join('');
+    panel.innerHTML+=`
+    <div class="card">
+      <div class="card-header"><span>🔬</span><span class="card-title">Diagnosis Prediction</span>
+      <span class="card-badge" style="background:rgba(0,212,255,.1);color:var(--accent)">LLaMA-3 QLoRA</span></div>
+      <div class="card-body">
+        <div class="diagnosis-main">${d.primary}</div>
+        <div style="font-size:12px;color:var(--muted)">Confidence: <span style="color:${cc};font-family:var(--mono)">${conf}%</span></div>
+        <div class="confidence-bar"><div class="confidence-fill" style="width:${conf}%;background:linear-gradient(90deg,var(--accent),${cc})"></div></div>
+        ${diffs?`<div class="diff-list">${diffs}</div>`:''}
+        ${d.reasoning?`<div style="font-size:12px;color:var(--muted);margin-top:12px;line-height:1.6;font-style:italic">${d.reasoning}</div>`:''}
+      </div>
+    </div>`;
+  }
+
+  // KG
+  if(data.knowledge_graph && data.knowledge_graph.kg_json){
+    const triples=data.knowledge_graph.triples||[];
+    panel.innerHTML+=`
+    <div class="card">
+      <div class="card-header"><span>🕸️</span><span class="card-title">Knowledge Graph</span>
+      <span class="card-badge" style="background:rgba(0,212,255,.1);color:var(--accent)">${data.knowledge_graph.triple_count} triples</span></div>
+      <div class="card-body">
+        <svg id="kg-canvas"></svg>
+        ${triples.length?`
+        <div style="margin-top:16px;max-height:200px;overflow-y:auto">
+          <table class="triple-table"><thead><tr><th>Subject</th><th>Predicate</th><th>Object</th></tr></thead><tbody>
+          ${triples.slice(0,25).map(([s,p,o])=>`<tr><td class="t-subject">${String(s).substring(0,15)}</td><td class="t-pred">${p}</td><td class="t-obj" title="${o}">${String(o).substring(0,55)}</td></tr>`).join('')}
+          </tbody></table>
+        </div>`:''}
+      </div>
+    </div>`;
+    setTimeout(()=>renderKG(data.knowledge_graph.kg_json),100);
+  }
+
+  // Explanation
+  if(data.explanation){
+    const fmt=data.explanation
+      .replace(/## (.*)/g,'<h2>$1</h2>').replace(/### (.*)/g,'<h3>$1</h3>')
+      .replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--accent)">$1</strong>')
+      .replace(/\n/g,'<br>');
+    panel.innerHTML+=`
+    <div class="card">
+      <div class="card-header"><span>💡</span><span class="card-title">Clinical Explanation</span>
+      <span class="card-badge" style="background:rgba(0,255,136,.1);color:var(--accent2)">RAG · Guidelines</span></div>
+      <div class="card-body"><div class="explanation-body">${fmt}</div></div>
+    </div>`;
+  }
+}
+
+function renderKG(kg){
+  const svg=d3.select('#kg-canvas');
+  const el=document.getElementById('kg-canvas');
+  if(!el||!kg.nodes||kg.nodes.length===0)return;
+  const W=el.clientWidth||600,H=380;
+  svg.attr('viewBox',`0 0 ${W} ${H}`).attr('width',W).attr('height',H);
+  svg.selectAll('*').remove();
+  const nodes=kg.nodes.map(n=>({...n}));
+  const links=kg.edges.map(e=>({...e}));
+  const sim=d3.forceSimulation(nodes)
+    .force('link',d3.forceLink(links).id(d=>d.id).distance(80))
+    .force('charge',d3.forceManyBody().strength(-120))
+    .force('center',d3.forceCenter(W/2,H/2))
+    .force('collision',d3.forceCollide(30));
+  const g=svg.append('g');
+  svg.call(d3.zoom().on('zoom',e=>g.attr('transform',e.transform)));
+  svg.append('defs').append('marker').attr('id','arrow').attr('viewBox','0 -5 10 10').attr('refX',20).attr('refY',0).attr('markerWidth',6).attr('markerHeight',6).attr('orient','auto').append('path').attr('d','M0,-5L10,0L0,5').attr('fill','#1e3a5f');
+  const link=g.append('g').selectAll('line').data(links).join('line').attr('stroke','#1e3a5f').attr('stroke-width',1).attr('marker-end','url(#arrow)');
+  const node=g.append('g').selectAll('g').data(nodes).join('g')
+    .call(d3.drag().on('start',(e,d)=>{if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y})
+      .on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y})
+      .on('end',(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null}));
+  node.append('circle').attr('r',d=>d.type==='Patient'?18:10)
+    .attr('fill',d=>d.type==='Patient'?'#00d4ff22':'#1a2235')
+    .attr('stroke',d=>d.type==='Patient'?'#00d4ff':'#1e3a5f').attr('stroke-width',d=>d.type==='Patient'?2:1);
+  node.append('text').attr('dy','.35em').attr('text-anchor','middle')
+    .attr('fill',d=>d.type==='Patient'?'#00d4ff':'#6b8caa').attr('font-size','8px').attr('font-family','IBM Plex Mono')
+    .text(d=>String(d.id).substring(0,12));
+  node.append('title').text(d=>d.id);
+  sim.on('tick',()=>{
+    link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+    node.attr('transform',d=>`translate(${d.x},${d.y})`);
+  });
+}
+
+setAction('predict');
+</script>
+</body>
+</html>

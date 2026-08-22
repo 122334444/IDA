@@ -24,7 +24,7 @@ class QuantisationFineTuningTool:
     on patient prompts from SPA.
     """
 
-    def __init__(self, cfg: dict):
+    def __init__(self, cfg: dict):#
         self.cfg = cfg
         self.llm_cfg = cfg["llm"]
         self.model_output = cfg["paths"]["fine_tuned_model"]
@@ -87,10 +87,10 @@ class QuantisationFineTuningTool:
             bias=lora_cfg["bias"],
             task_type=lora_cfg["task_type"],
         )
-        model = get_peft_model(model, peft_config)
+        model = get_peft_model(model, peft_config)#Atach lora adopters 
         model.print_trainable_parameters()
 
-        # Dataset
+        # Dataset -> python data into hugging face dataset
         hf_dataset = Dataset.from_list(dataset)
 
         # Training arguments

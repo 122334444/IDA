@@ -32,8 +32,8 @@ except LookupError:
     nltk.download("words", quiet=True)
 
 
-# ─── NIH Disease Prompts for CLIP ─────────────────────────────────────────────
-
+#  NIH Disease Prompts for CLIP
+    
 NIH_PATHOLOGY_PROMPTS = {
     "Atelectasis": [
         "chest x-ray showing atelectasis",
